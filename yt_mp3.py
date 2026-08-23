@@ -6,21 +6,26 @@ import zipfile
 # --- SISTEMA DE AUTO-INSTALACION DE LIBRERIAS ---
 try:
     import yt_dlp
+    import imageio_ffmpeg
 except ImportError:
-    print("La libreria 'yt-dlp' no esta instalada. Instalando automaticamente, por favor espera...")
+    print("Faltan librerias necesarias. Instalando dependencias automaticamente, por favor espera...")
     try:
-        # Ejecuta el comando pip install de forma automatica
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "yt-dlp"])
+        # Ejecuta el comando pip install para instalar ambas herramientas
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "yt-dlp", "imageio-ffmpeg"])
         import yt_dlp
+        import imageio_ffmpeg
         print("Instalacion completada con exito.\n")
     except Exception as e:
-        print(f"Error al intentar instalar yt-dlp automaticamente: {e}")
-        print("Por favor, abre tu terminal y escribe: pip install yt-dlp")
+        print(f"Error al intentar instalar las dependencias automaticamente: {e}")
+        print("Por favor, abre tu terminal y escribe: pip install yt-dlp imageio-ffmpeg")
         sys.exit(1)
 # ------------------------------------------------
 
 def descargar_y_convertir(url):
     os.makedirs('descargas_temporales', exist_ok=True)
+    
+    # Obtenemos la ruta del FFmpeg que acabamos de instalar automaticamente
+    ruta_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     
     opciones_info = {
         'extract_flat': True,
@@ -31,6 +36,7 @@ def descargar_y_convertir(url):
     opciones_descarga = {
         'format': 'bestaudio/best',
         'outtmpl': 'descargas_temporales/%(title)s_%(id)s.%(ext)s',
+        'ffmpeg_location': ruta_ffmpeg,  # Le indicamos a yt-dlp donde esta FFmpeg
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
