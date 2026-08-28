@@ -1,0 +1,29 @@
+﻿################################################################################
+# Este archivo .gitignore ha sido creado automáticamente por Microsoft(R) Visual Studio.
+################################################################################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# Archivos temporales y de salida
+descargas_temporales/
+*.mp3
+*.webm
+*.m4a
+*.zip
+
+# Logs y SO
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.vs/
