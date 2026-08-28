@@ -1,144 +1,194 @@
+# -*- coding: utf-8 -*-
+import argparse
 import os
 import sys
-import subprocess
+import tempfile
 import zipfile
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
-# --- SISTEMA DE AUTO-INSTALACION DE LIBRERIAS ---
-try:
-    import yt_dlp
-    import imageio_ffmpeg
-except ImportError:
-    print("Faltan librerias necesarias. Instalando dependencias automaticamente, por favor espera...")
-    try:
-        # Ejecuta el comando pip install para instalar ambas herramientas
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "yt-dlp", "imageio-ffmpeg"])
-        import yt_dlp
-        import imageio_ffmpeg
-        print("Instalacion completada con exito.\n")
-    except Exception as e:
-        print(f"Error al intentar instalar las dependencias automaticamente: {e}")
-        print("Por favor, abre tu terminal y escribe: pip install yt-dlp imageio-ffmpeg")
-        sys.exit(1)
-# ------------------------------------------------
+import imageio_ffmpeg
+import yt_dlp
 
-def descargar_y_convertir(url):
-    os.makedirs('descargas_temporales', exist_ok=True)
-    
-    # Obtenemos la ruta del FFmpeg que acabamos de instalar automaticamente
-    ruta_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-    
+
+def configurar_opciones_yt_dlp(
+    directorio_salida: Path, ruta_ffmpeg: str
+) -> Tuple[Dict, Dict]:
+    # Genera los diccionarios de configuracion para extraccion y descarga.
     opciones_info = {
-        'extract_flat': True,
-        'ignoreerrors': True,
-        'quiet': True
+        "extract_flat": True,
+        "ignoreerrors": True,
+        "quiet": True,
+        "no_warnings": True,
     }
-    
+
     opciones_descarga = {
-        'format': 'bestaudio/best',
-        'outtmpl': 'descargas_temporales/%(title)s_%(id)s.%(ext)s',
-        'ffmpeg_location': ruta_ffmpeg,  # Le indicamos a yt-dlp donde esta FFmpeg
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'quiet': True,
-        'no_warnings': True,
-        'nocheckcertificate': True
+        "format": "bestaudio/best",
+        "outtmpl": str(directorio_salida / "%(title)s_%(id)s.%(ext)s"),
+        "ffmpeg_location": ruta_ffmpeg,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
+        "quiet": True,
+        "no_warnings": True,
     }
 
-    archivos_descargados = []
-    archivos_fallidos = []
+    return opciones_info, opciones_descarga
 
-    print("Analizando el enlace...")
+
+def descargar_y_convertir(
+    url: str, directorio_salida: Path
+) -> Tuple[List[Path], List[Dict[str, str]]]:
+    # Descarga el audio de una URL/Playlist y lo convierte a MP3.
+    ruta_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    opciones_info, opciones_descarga = configurar_opciones_yt_dlp(
+        directorio_salida, ruta_ffmpeg
+    )
+
+    archivos_descargados: List[Path] = []
+    archivos_fallidos: List[Dict[str, str]] = []
+
+    print("[*] Analizando enlace y obteniendo metadatos...")
     try:
         with yt_dlp.YoutubeDL(opciones_info) as ydl:
             info = ydl.extract_info(url, download=False)
-            
-        if info is None:
-            return [], [{"titulo": "Enlace proporcionado", "razon": "No se pudo obtener informacion. Verifica si el video es privado o el enlace es incorrecto."}]
 
-        entries = info.get('entries', [info])
+        if not info:
+            return [], [
+                {
+                    "titulo": url,
+                    "razon": "No se pudo obtener informacion del enlace provisto.",
+                }
+            ]
 
+        entries = info.get("entries", [info])
     except Exception as e:
-        return [], [{"titulo": url, "razon": f"Error critico al leer el enlace: {str(e)}"}]
+        return [], [{"titulo": url, "razon": f"Fallo al procesar el enlace: {str(e)}"}]
 
-    print(f"Se detectaron {len(entries)} elementos. Iniciando descarga...")
+    total_elementos = len(entries)
+    print(f"[*] Elementos detectados: {total_elementos}. Iniciando descargas...")
 
     with yt_dlp.YoutubeDL(opciones_descarga) as ydl_descarga:
-        for i, entry in enumerate(entries):
+        for idx, entry in enumerate(entries, start=1):
             if entry is None:
-                archivos_fallidos.append({
-                    "titulo": f"Pista #{i+1} (Desconocida)", 
-                    "razon": "Video no disponible (posiblemente privado, eliminado o geobloqueado)."
-                })
+                archivos_fallidos.append(
+                    {
+                        "titulo": f"Pista #{idx}",
+                        "razon": "Video no disponible, eliminado o con restriccion regional.",
+                    }
+                )
                 continue
-            
-            titulo = entry.get('title', f"Pista #{i+1}")
-            
-            video_url = entry.get('webpage_url') or entry.get('url')
-            if not video_url and entry.get('id'):
-                video_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
-            elif not video_url:
-                video_url = url
-            
-            print(f"Descargando: {titulo}...")
-            
+
+            titulo = entry.get("title", f"Pista #{idx}")
+            video_url = (
+                entry.get("webpage_url")
+                or entry.get("url")
+                or f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+            )
+
+            print(f"[{idx}/{total_elementos}] Descargando: {titulo}")
+
             try:
-                info_descarga = ydl_descarga.extract_info(video_url, download=True)
-                
+                info_descarga = ydl_descarga.extract_info(
+                    video_url, download=True
+                )
                 if info_descarga:
-                    filename = ydl_descarga.prepare_filename(info_descarga)
-                    base, _ = os.path.splitext(filename)
-                    mp3_file = base + ".mp3"
-                    
-                    if os.path.exists(mp3_file):
-                        archivos_descargados.append(mp3_file)
+                    filename = Path(ydl_descarga.prepare_filename(info_descarga))
+                    mp3_path = filename.with_suffix(".mp3")
+
+                    if mp3_path.exists():
+                        archivos_descargados.append(mp3_path)
                     else:
-                        archivos_fallidos.append({"titulo": titulo, "razon": "Se descargo, pero fallo la conversion a formato MP3."})
+                        archivos_fallidos.append(
+                            {
+                                "titulo": titulo,
+                                "razon": "Descarga finalizada pero no se genero el archivo MP3.",
+                            }
+                        )
             except Exception as e:
-                error_msg = str(e).split('\n')[0]
-                archivos_fallidos.append({"titulo": titulo, "razon": error_msg})
+                error_sanitizado = str(e).split("\n")[0]
+                archivos_fallidos.append(
+                    {"titulo": titulo, "razon": error_sanitizado}
+                )
 
     return archivos_descargados, archivos_fallidos
 
-def crear_zip(archivos, nombre_zip="musica_descargada.zip", borrar_originales=True):
+
+def empaquetar_en_zip(archivos: List[Path], ruta_zip_salida: Path) -> Optional[Path]:
+    # Comprime los archivos procesados en el ZIP final.
     if not archivos:
         return None
-        
-    print(f"Empaquetando {len(archivos)} canciones en '{nombre_zip}'...")
-    
-    with zipfile.ZipFile(nombre_zip, 'w') as zipf:
+
+    print(f"[*] Empaquetando {len(archivos)} canciones en '{ruta_zip_salida.name}'...")
+    with zipfile.ZipFile(ruta_zip_salida, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
         for archivo in archivos:
-            if os.path.exists(archivo):
-                zipf.write(archivo, arcname=os.path.basename(archivo))
-                if borrar_originales:
-                    os.remove(archivo)
-                    
-    return nombre_zip
+            if archivo.exists():
+                zipf.write(archivo, arcname=archivo.name)
+
+    return ruta_zip_salida
+
+
+def procesar_pipeline(url: str, salida_zip: str) -> None:
+    # Ejecuta el pipeline completo bajo un contexto temporal seguro.
+    ruta_zip_final = Path(salida_zip).resolve()
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        descargados, fallidos = descargar_y_convertir(url, temp_path)
+
+        print("\n" + "=" * 50)
+        print("RESUMEN DE LA OPERACION")
+        print("=" * 50)
+
+        if descargados:
+            zip_generado = empaquetar_en_zip(descargados, ruta_zip_final)
+            print(f"[+] EXITO: {len(descargados)} pistas procesadas correctamente.")
+            if zip_generado:
+                print(f"[+] Archivo ZIP guardado en: {zip_generado}")
+        else:
+            print("[-] AVISO: No se proceso ningun archivo de audio exitosamente.")
+
+        if fallidos:
+            print(f"\n[!] ADVERTENCIAS: {len(fallidos)} elemento(s) no descargado(s):")
+            for fallo in fallidos:
+                print(f"  - {fallo['titulo']}")
+                print(f"    Razon: {fallo['razon']}\n")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Descarga y empaqueta audio de YouTube (videos o playlists) a MP3 en un ZIP."
+    )
+    parser.add_argument(
+        "-u", "--url", type=str, help="URL del video o lista de reproduccion."
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default="musica_descargada.zip",
+        help="Nombre/Ruta del archivo ZIP de salida (Default: musica_descargada.zip).",
+    )
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
-    enlace = input("Ingresa el enlace de YouTube (video o playlist): ")
-    
-    descargados, fallidos = descargar_y_convertir(enlace)
-    
-    print("\n" + "="*50 + "\nRESUMEN DE LA OPERACION\n" + "="*50)
-    
-    if descargados:
-        print(f"EXITO: Se descargaron y convirtieron {len(descargados)} canciones.")
-        archivo_zip = crear_zip(descargados)
-        if archivo_zip:
-            print(f"Listo. Tu archivo ZIP esta aqui: {os.path.abspath(archivo_zip)}")
-    else:
-        print("ADVERTENCIA: No se pudo descargar ninguna cancion.")
+    args = parse_args()
+    enlace_objetivo = args.url
 
-    if fallidos:
-        print(f"\nERRORES: Hubo {len(fallidos)} pistas que NO se pudieron descargar:")
-        for fallo in fallidos:
-            print(f"  - {fallo['titulo']}")
-            print(f"    -> Razon: {fallo['razon']}\n")
-            
-    try:
-        os.rmdir('descargas_temporales')
-    except OSError:
-        pass
+    if not enlace_objetivo:
+        try:
+            enlace_objetivo = input("Ingresa el enlace de YouTube (video o playlist): ").strip()
+        except KeyboardInterrupt:
+            print("\nOperacion cancelada por el usuario.")
+            sys.exit(0)
+
+    if not enlace_objetivo:
+        print("Error: No se proporciono ninguna URL.")
+        sys.exit(1)
+
+    procesar_pipeline(enlace_objetivo, args.output)
