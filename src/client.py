@@ -1,4 +1,5 @@
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 from typing import Tuple
@@ -12,11 +13,21 @@ from src.config import DownloadConfig
 console = Console()
 
 
+def actualizar_yt_dlp() -> None:
+    # Actualiza yt-dlp a su version mas reciente usando pip
+    console.print("[bold cyan][*] Comprobando y actualizando yt-dlp...[/bold cyan]")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
+        console.print("[bold green][+] yt-dlp actualizado correctamente.[/bold green]\n")
+    except Exception as e:
+        console.print(f"[bold red][-] Error actualizando yt-dlp: {e}[/bold red]\n")
+
+
 def solicitar_datos_interactivos() -> Tuple[str, str, str, str, bool, int]:
     console.print(
         Panel.fit(
             "[bold cyan]Media Downloader Pro (YouTube & Spotify)[/bold cyan]\n"
-            "[dim]Audio/Video concurrente con metadatos oficiales y QR local[/dim]",
+            "[dim]Audio/Video concurrente con historial, m3u, normalizacion y QR[/dim]",
             border_style="cyan",
         )
     )
@@ -51,8 +62,8 @@ def solicitar_datos_interactivos() -> Tuple[str, str, str, str, bool, int]:
         normalizar = opc_norm.lower() == "s"
 
     console.print("\n[bold]Destino de los archivos:[/bold]")
-    console.print("  [cyan]1)[/cyan] Guardar en PC (archivo ZIP)")
-    console.print("  [cyan]2)[/cyan] Guardar en PC (carpeta suelta)")
+    console.print("  [cyan]1)[/cyan] Guardar en PC (archivo ZIP con playlist .m3u)")
+    console.print("  [cyan]2)[/cyan] Guardar en PC (carpeta suelta con playlist .m3u)")
     console.print("  [cyan]3)[/cyan] Descargar directo al movil via QR (cero residuos en PC)")
     opc_destino = Prompt.ask("Selecciona destino", choices=["1", "2", "3"], default="1")
 
@@ -64,7 +75,7 @@ def solicitar_datos_interactivos() -> Tuple[str, str, str, str, bool, int]:
 
 def obtener_configuracion(temp_dir: Path) -> DownloadConfig:
     parser = argparse.ArgumentParser(
-        description="Downloader concurrente de YouTube y Spotify con interfaz Rich, normalizacion y QR."
+        description="Downloader concurrente de YouTube y Spotify con interfaz Rich, historial y QR."
     )
     parser.add_argument("-u", "--url", type=str, help="URL de YouTube o Spotify.")
     parser.add_argument("-f", "--format", choices=["mp3", "mp4"], help="Formato de salida.")
@@ -74,8 +85,13 @@ def obtener_configuracion(temp_dir: Path) -> DownloadConfig:
     parser.add_argument("--normalize", action="store_true", help="Normaliza volumen de audio EBU R128.")
     parser.add_argument("--qr", action="store_true", help="Modo movil via QR.")
     parser.add_argument("--no-zip", action="store_true", help="Guardar en carpeta sin comprimir.")
+    parser.add_argument("--update", action="store_true", help="Actualiza yt-dlp a la ultima version y sale.")
 
     args = parser.parse_args()
+
+    if args.update:
+        actualizar_yt_dlp()
+        sys.exit(0)
 
     if args.url:
         url = args.url

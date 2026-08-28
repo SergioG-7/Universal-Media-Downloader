@@ -6,6 +6,7 @@ import imageio_ffmpeg
 import yt_dlp
 
 from src.config import DownloadConfig
+from src.history import cargar_historial, guardar_en_historial
 from src.postprocessor import incrustar_metadatos_mp3
 from src.spotify_resolver import (
     buscar_coincidencia_youtube,
@@ -19,6 +20,7 @@ class MediaDownloader:
     def __init__(self, config: DownloadConfig):
         self.config = config
         self.ruta_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        self.historial = cargar_historial()
 
     def _obtener_opciones_ydl(
         self, plantilla_salida: str, hook_progreso: Callable[[Dict[str, Any]], None] | None = None
@@ -70,7 +72,6 @@ class MediaDownloader:
         return opciones
 
     def extraer_info(self) -> Tuple[List[Dict[str, Any]], str | None]:
-        # Deteccion automatica si es enlace de Spotify
         if es_url_spotify(self.config.url):
             tracks_sp, err = extraer_tracks_spotify(self.config.url)
             if err:
@@ -78,7 +79,6 @@ class MediaDownloader:
             entries = [{"is_spotify": True, "spotify_meta": t} for t in tracks_sp]
             return entries, None
 
-        # Proceso estandar de YouTube
         opciones_info = {
             "extract_flat": True,
             "ignoreerrors": True,
@@ -106,15 +106,32 @@ class MediaDownloader:
         if entry.get("is_spotify"):
             meta_spotify = entry["spotify_meta"]
             titulo = f"{meta_spotify['artist']} - {meta_spotify['title']}"
+            track_id = f"{meta_spotify['artist']}_{meta_spotify['title']}".lower()
+
+            # Verificacion de duplicado en historial
+            if track_id in self.historial:
+                if progress_callback:
+                    progress_callback(indice, 100.0, "Omitido (Duplicado)")
+                return False, titulo, None, "Omitido por estar registrado en el historial."
+
             video_url, err = buscar_coincidencia_youtube(meta_spotify)
             if not video_url or err:
                 return False, titulo, None, err or "Sin coincidencia en YouTube."
         else:
             titulo = entry.get("title", f"Pista_{indice}")
+            yt_id = entry.get("id") or ""
+            track_id = yt_id if yt_id else titulo.lower()
+
+            # Verificacion de duplicado en historial
+            if track_id in self.historial:
+                if progress_callback:
+                    progress_callback(indice, 100.0, "Omitido (Duplicado)")
+                return False, titulo, None, "Omitido por estar registrado en el historial."
+
             video_url = (
                 entry.get("webpage_url")
                 or entry.get("url")
-                or f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+                or f"https://www.youtube.com/watch?v={yt_id}"
             )
 
         plantilla = str(self.config.directorio_salida / "%(title)s.%(ext)s")
@@ -164,6 +181,8 @@ class MediaDownloader:
                             pass
 
                 if archivo_final.exists():
+                    # Guardar registro en historial para no repetir
+                    guardar_en_historial(track_id)
                     if progress_callback:
                         progress_callback(indice, 100.0, "Completado")
                     return True, titulo, archivo_final, ""
