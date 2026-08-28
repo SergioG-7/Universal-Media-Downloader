@@ -3,62 +3,76 @@ import sys
 from pathlib import Path
 from typing import Tuple
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+
 from src.config import DownloadConfig
 
+console = Console()
 
-def solicitar_datos_interactivos() -> Tuple[str, str, str, str, int]:
-    url = input("Ingresa el enlace de YouTube (video o playlist): ").strip()
+
+def solicitar_datos_interactivos() -> Tuple[str, str, str, str, bool, int]:
+    console.print(
+        Panel.fit(
+            "[bold cyan]YouTube Downloader Pro[/bold cyan]\n"
+            "[dim]Audio/Video concurrente con normalizacion y transferencia QR[/dim]",
+            border_style="cyan",
+        )
+    )
+
+    url = Prompt.ask("[bold yellow]Ingresa el enlace de YouTube (video o playlist)[/bold yellow]").strip()
     if not url:
-        print("Error: El enlace no puede estar vacio.")
+        console.print("[red]Error: El enlace no puede estar vacio.[/red]")
         sys.exit(1)
 
-    print("\nSelecciona el formato:")
-    print("1) Audio MP3")
-    print("2) Video MP4")
-    opc_formato = input("Opcion [1/2] (Default: 1): ").strip()
+    console.print("\n[bold]Formato de salida:[/bold]")
+    console.print("  [cyan]1)[/cyan] Audio MP3")
+    console.print("  [cyan]2)[/cyan] Video MP4")
+    opc_formato = Prompt.ask("Selecciona formato", choices=["1", "2"], default="1")
 
+    normalizar = False
     if opc_formato == "2":
         formato = "mp4"
-        print("\nSelecciona la resolucion:")
-        print("1) Mejor disponible (best)")
-        print("2) 1080p")
-        print("3) 720p")
-        print("4) 480p")
-        opc_cal = input("Opcion [1-4] (Default: 1): ").strip()
+        console.print("\n[bold]Resolucion de video:[/bold]")
+        console.print("  [cyan]1)[/cyan] Mejor disponible (best)\n  [cyan]2)[/cyan] 1080p\n  [cyan]3)[/cyan] 720p\n  [cyan]4)[/cyan] 480p")
+        opc_cal = Prompt.ask("Selecciona calidad", choices=["1", "2", "3", "4"], default="1")
         calidades = {"1": "best", "2": "1080p", "3": "720p", "4": "480p"}
         calidad = calidades.get(opc_cal, "best")
     else:
         formato = "mp3"
-        print("\nSelecciona el bitrate:")
-        print("1) 320 kbps (Alta calidad)")
-        print("2) 192 kbps (Estandar)")
-        print("3) 128 kbps (Ligero)")
-        opc_cal = input("Opcion [1-3] (Default: 2): ").strip()
+        console.print("\n[bold]Bitrate de audio:[/bold]")
+        console.print("  [cyan]1)[/cyan] 320 kbps (Alta fidelidad)\n  [cyan]2)[/cyan] 192 kbps (Estandar)\n  [cyan]3)[/cyan] 128 kbps (Ligero)")
+        opc_cal = Prompt.ask("Selecciona calidad", choices=["1", "2", "3"], default="2")
         calidades = {"1": "320k", "2": "192k", "3": "128k"}
         calidad = calidades.get(opc_cal, "192k")
 
-    print("\nDestino de los archivos:")
-    print("1) Guardar en PC (archivo ZIP)")
-    print("2) Guardar en PC (carpeta suelta)")
-    print("3) Descargar directo al movil via QR (no guarda nada en PC)")
-    opc_destino = input("Opcion [1/2/3] (Default: 1): ").strip()
+        opc_norm = Prompt.ask("\nDeseas normalizar el volumen del audio (EBU R128)?", choices=["s", "n"], default="s")
+        normalizar = opc_norm.lower() == "s"
+
+    console.print("\n[bold]Destino de los archivos:[/bold]")
+    console.print("  [cyan]1)[/cyan] Guardar en PC (archivo ZIP)")
+    console.print("  [cyan]2)[/cyan] Guardar en PC (carpeta suelta)")
+    console.print("  [cyan]3)[/cyan] Descargar directo al movil via QR (cero residuos en PC)")
+    opc_destino = Prompt.ask("Selecciona destino", choices=["1", "2", "3"], default="1")
 
     mapa_destino = {"1": "zip", "2": "carpeta", "3": "movil"}
     modo_salida = mapa_destino.get(opc_destino, "zip")
 
-    return url, formato, calidad, modo_salida, 4
+    return url, formato, calidad, modo_salida, normalizar, 4
 
 
 def obtener_configuracion(temp_dir: Path) -> DownloadConfig:
     parser = argparse.ArgumentParser(
-        description="Downloader concurrente de YouTube a MP3/MP4 con streaming QR al movil."
+        description="Downloader concurrente de YouTube con interfaz Rich, normalizacion y QR."
     )
     parser.add_argument("-u", "--url", type=str, help="URL del video o playlist.")
     parser.add_argument("-f", "--format", choices=["mp3", "mp4"], help="Formato de salida.")
-    parser.add_argument("-q", "--quality", type=str, help="Calidad (Audio: 128k, 192k, 320k | Video: best, 1080p, 720p, 480p).")
-    parser.add_argument("-o", "--output", type=str, default="descargas", help="Ruta/nombre base de salida.")
-    parser.add_argument("-w", "--workers", type=int, default=4, help="Numero de descargas paralelas (Default: 4).")
-    parser.add_argument("--qr", action="store_true", help="Modo movil: Sirve por QR y no guarda en PC.")
+    parser.add_argument("-q", "--quality", type=str, help="Calidad de audio o video.")
+    parser.add_argument("-o", "--output", type=str, default="descargas", help="Ruta de salida.")
+    parser.add_argument("-w", "--workers", type=int, default=4, help="Descargas paralelas.")
+    parser.add_argument("--normalize", action="store_true", help="Normaliza volumen de audio EBU R128.")
+    parser.add_argument("--qr", action="store_true", help="Modo movil via QR.")
     parser.add_argument("--no-zip", action="store_true", help="Guardar en carpeta sin comprimir.")
 
     args = parser.parse_args()
@@ -78,14 +92,15 @@ def obtener_configuracion(temp_dir: Path) -> DownloadConfig:
         else:
             modo_salida = "zip"
 
+        normalizar = args.normalize
         workers = args.workers
         nombre_salida = args.output
     else:
         try:
-            url, formato, calidad, modo_salida, workers = solicitar_datos_interactivos()
+            url, formato, calidad, modo_salida, normalizar, workers = solicitar_datos_interactivos()
             nombre_salida = "descargas"
         except KeyboardInterrupt:
-            print("\nOperacion cancelada por el usuario.")
+            console.print("\n[yellow]Operacion cancelada por el usuario.[/yellow]")
             sys.exit(0)
 
     ruta_destino = None
@@ -102,5 +117,6 @@ def obtener_configuracion(temp_dir: Path) -> DownloadConfig:
         directorio_salida=temp_dir,
         modo_salida=modo_salida,
         ruta_destino=ruta_destino,
+        normalizar_audio=normalizar,
         max_workers=workers,
     )
