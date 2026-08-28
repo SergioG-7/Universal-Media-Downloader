@@ -1,26 +1,25 @@
-# YouTube & Spotify Multi-Format Downloader & Zipper
+# YouTube & Spotify Multi-Format Downloader
 
 [![CI Pipeline](https://github.com/SergioG-7/Youtube-Media-Downloader/actions/workflows/ci.yml/badge.svg)](https://github.com/SergioG-7/Youtube-Media-Downloader/actions)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-Herramienta modular de línea de comandos (CLI) de alto rendimiento para la descarga, transcodificación y empaquetado de contenido multimedia desde YouTube y Spotify (canciones individuales, álbumes o listas de reproducción). Diseñada con arquitectura modular (*src-layout*), procesamiento concurrente multihilo, normalización de audio profesional, transferencia inalámbrica local vía código QR y exportación automática de listas `.m3u`.
+Herramienta de terminal para descargar canciones, álbumes, listas de reproducción y videos de YouTube y Spotify en MP3 o MP4. Organiza las descargas, añade carátulas e información de las pistas, permite pasar los archivos directamente al móvil con un código QR y crea listas de reproducción `.m3u`.
 
 ## Características
 
-* **Soporte Multi-Plataforma & Formato:**
-  * **YouTube:** Descarga de videos individuales y playlists completas.
-  * **Spotify:** Resolución automática de pistas/álbumes/playlists públicas sin requerir API Keys, extrayendo metadatos oficiales y descargando el audio equivalente en YouTube.
-  * **Audio (MP3):** Bitrates configurables (128k, 192k, 320k) con inyección automática de etiquetas ID3 (Título, Artista, Álbum, Año) y portada incrustada en alta resolución.
-  * **Video (MP4):** Multiplexado y transcodificación inteligente hasta 1080p vía FFmpeg.
-* **Descarga Concurrente Multihilo:** Utiliza `ThreadPoolExecutor` para procesar múltiples pistas en paralelo, optimizando significativamente los tiempos de descarga.
-* **Normalización de Audio (EBU R128):** Filtro `loudnorm` integrado para nivelar el volumen percibido entre diferentes fuentes de audio.
-* **Transferencia Móvil vía QR (Zero-Disk Footprint):** Levanta un micro-servidor HTTP local efímero y proyecta un código QR en consola para descargar archivos directamente al smartphone desde la misma red Wi-Fi sin dejar residuos en el PC.
-* **Control de Duplicados & Historial:** Registro automático en `history.json` para evitar descargar archivos previamente procesados.
-* **Exportador de Playlists (.m3u):** Generación automática de listas de reproducción universales compatibles con reproductores de Android y PC.
-* **Auto-actualización de Motor:** Comando integrado `--update` para actualizar `yt-dlp` a su versión más reciente ante cambios en YouTube.
-* **Interfaz de Terminal Avanzada:** Monitorización en tiempo real con barras de progreso individuales por hilo, spinners y tablas de resumen mediante `Rich`.
+* **Descarga de YouTube y Spotify:**
+  * **YouTube:** Descarga videos sueltos o listas completas.
+  * **Spotify:** Busca automáticamente las canciones en YouTube y guarda la carátula oficial y los datos del tema (artista, álbum, año).
+  * **Audio (MP3):** Elige la calidad (128k, 192k, 320k) con carátula y datos de la canción incluidos.
+  * **Video (MP4):** Descarga videos en diferentes resoluciones hasta 1080p.
+* **Descargas paralelas:** Descarga varias canciones al mismo tiempo para terminar más rápido las listas largas.
+* **Volumen nivelado:** Opción para que todas las canciones suenen al mismo nivel y no haya cambios bruscos de sonido.
+* **Paso directo al móvil con QR:** Escanea un código QR desde el móvil para descargarlo por Wi-Fi sin ocupar espacio en el PC.
+* **Control de canciones repetidas:** Lleva un registro en `history.json` para no volver a descargar temas que ya bajaste.
+* **Lista de reproducción (.m3u):** Crea un archivo de lista compatible con reproductores de música de Android y PC.
+* **Actualización sencilla:** Comando `--update` para actualizar el motor de descargas si YouTube cambia algo.
+* **Interfaz clara en consola:** Barras de progreso por cada descarga y tabla con el resumen final.
 
 ## Requisitos
 
@@ -44,25 +43,25 @@ pip install -r requirements.txt
 
 ## Guía de Uso
 
-### Modo Interactivo (Asistente en Terminal)
-Ejecuta el programa directamente sin parámetros para acceder al menú interactivo:
+### Modo Guiado (Menú interactivo)
+Ejecuta el programa directamente para que te vaya preguntando qué quieres hacer paso a paso:
 ```bash
 python main.py
 ```
 
-### Modo CLI (Parámetros por Línea de Comandos)
+### Modo Comandos (CLI)
 
 ```bash
-# Descargar playlist de YouTube en MP3 (320 kbps) con normalización y 6 hilos
+# Descargar una playlist de YouTube en MP3 (320 kbps) con volumen nivelado y 6 descargas a la vez
 python main.py -u "[https://www.youtube.com/playlist?list=ID](https://www.youtube.com/playlist?list=ID)" -f mp3 -q 320k -w 6 --normalize
 
-# Descargar cancion o album de Spotify a MP3 y transferir directo al movil vía QR
+# Descargar de Spotify a MP3 y pasarlo directo al móvil con QR
 python main.py -u "[https://open.spotify.com/track/ID](https://open.spotify.com/track/ID)" -f mp3 --qr
 
-# Descargar video en MP4 (1080p) y guardar en carpeta local sin comprimir en ZIP
+# Descargar video en MP4 (1080p) y guardarlo en una carpeta normal
 python main.py -u "[https://www.youtube.com/watch?v=ID](https://www.youtube.com/watch?v=ID)" -f mp4 -q 1080p --no-zip
 
-# Actualizar el motor yt-dlp a la versión más reciente
+# Actualizar el motor de descargas
 python main.py --update
 ```
 
@@ -70,32 +69,32 @@ python main.py --update
 
 ```text
 ├── .github/workflows/
-│   └── ci.yml               # Pipeline de Integración Continua (GitHub Actions)
+│   └── ci.yml               # Pruebas automáticas en GitHub
 ├── src/
 │   ├── __init__.py
-│   ├── client.py            # Parser CLI (argparse) y asistente interactivo con Rich
-│   ├── config.py            # Dataclass de configuración de ejecución
-│   ├── downloader.py        # Orquestador concurrente multihilo y llamadas a yt-dlp
-│   ├── file_dir.py          # Gestión de archivos, compresión ZIP UTF-8 y listas .m3u
-│   ├── history.py           # Sistema de deduplicación y persistencia de historial
-│   ├── postprocessor.py     # Inyección de metadatos ID3 y carátulas con Mutagen
-│   ├── server.py            # Servidor HTTP local y renderizado de QR ASCII
-│   └── spotify_resolver.py  # Extracción de metadatos de Spotify y matching en YouTube
+│   ├── client.py            # Menú interactivo y opciones de terminal
+│   ├── config.py            # Configuración de las descargas
+│   ├── downloader.py        # Motor de descarga en paralelo
+│   ├── file_dir.py          # Manejo de carpetas, archivos ZIP y listas .m3u
+│   ├── history.py           # Control de canciones ya descargadas
+│   ├── postprocessor.py     # Añade carátulas y datos a las canciones
+│   ├── server.py            # Servidor local para enviar al móvil con QR
+│   └── spotify_resolver.py  # Busca canciones de Spotify en YouTube
 ├── tests/
-│   └── test_core.py         # Suite de pruebas unitarias con Pytest
+│   └── test_core.py         # Pruebas del funcionamiento
 ├── .gitignore
-├── main.py                  # Entrypoint de la aplicación
+├── main.py                  # Archivo principal para ejecutar
 ├── requirements.txt
 └── README.md
 ```
 
-## Pruebas Unitarias
+## Pruebas
 
-Para ejecutar localmente las pruebas del sistema:
+Para comprobar que todo funciona bien:
 ```bash
 python -m pytest -v
 ```
 
 ## Licencia
 
-Distribuido bajo la Licencia MIT. Consulta el archivo `LICENSE` para más información.
+Distribuido bajo Licencia MIT. Consulta el archivo `LICENSE` para más información.
