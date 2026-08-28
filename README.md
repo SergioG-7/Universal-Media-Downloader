@@ -1,20 +1,23 @@
 # YouTube MP3 Downloader & Zipper
 
-Un script de Python diseñado para descargar música de YouTube (videos individuales o listas de reproducción completas), convertir el audio a formato MP3 y empaquetar todas las canciones automáticamente en un único archivo ZIP. 
+CLI optimizada en Python para descargar audio de videos individuales o listas de reproducción de YouTube, convertirlo automáticamente a formato MP3 (192 kbps) y empaquetar todas las pistas en un único archivo ZIP de forma limpia y ordenada.
 
-Ideal para hacer copias de seguridad de listas de reproducción largas de forma rápida y ordenada.
+## Características
 
-## Caracteristicas
-
-* **Soporte para Playlists:** Pega el enlace de un video único o de una lista de reproducción entera; el script se encarga del resto.
-* **Conversión a MP3:** Extrae el audio y lo convierte a formato MP3 de alta calidad (192 kbps).
-* **Empaquetado automático:** Al terminar, agrupa todas las canciones descargadas en un único archivo `musica_descargada.zip`.
-* **Auto-instalación de dependencias:** Si el usuario no tiene la librería `yt-dlp`, el script intentará instalarla automáticamente al ejecutarse.
-* **Reporte de errores:** Si alguna canción falla (por estar oculta, borrada o geobloqueada), el programa continúa con las demás y al final muestra un resumen detallado de qué falló y por qué.
-* **Limpieza inteligente:** Borra los archivos temporales una vez comprimidos para no ocupar espacio innecesario en tu disco duro.
+* **Soporte Completo para Playlists:** Procesa enlaces simples o listas de reproducción completas con extracción de metadatos en segundo plano.
+* **Conversión Automática:** Extracción y transcodificación directa a MP3 (192 kbps) mediante binarios integrados de FFmpeg.
+* **Manejo Seguro de Archivos:** Limpieza atómica mediante directorios temporales (`tempfile`); no deja archivos residuales si la ejecución se cancela.
+* **Resiliencia ante Fallos:** Si una pista de la playlist está bloqueada, eliminada o privada, el proceso continúa y genera un reporte detallado de errores al finalizar.
+* **Doble Modo de Uso:** Funciona como interfaz de comandos (CLI) con parámetros o en modo interactivo guiado por consola.
 
 ## Requisitos Previos
 
-Para que este script funcione correctamente, necesitas tener instalado en tu sistema:
+* Python 3.9 o superior.
+* Conexión a internet estable.
 
-**Python 3.x**
+## Instalación
+
+1. Clona este repositorio:
+```bash
+git clone [https://github.com/tu-usuario/youtube-mp3-zipper.git](https://github.com/tu-usuario/youtube-mp3-zipper.git)
+cd youtube-mp3-zipper
