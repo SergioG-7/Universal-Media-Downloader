@@ -7,6 +7,11 @@ import yt_dlp
 
 from src.config import DownloadConfig
 from src.postprocessor import incrustar_metadatos_mp3
+from src.spotify_resolver import (
+    buscar_coincidencia_youtube,
+    es_url_spotify,
+    extraer_tracks_spotify,
+)
 
 
 class MediaDownloader:
@@ -39,7 +44,6 @@ class MediaDownloader:
                 }
             ]
 
-            # Normalizacion de audio EBU R128 con FFmpeg si esta activada
             postprocessor_args = []
             if self.config.normalizar_audio:
                 postprocessor_args.extend(["-af", "loudnorm=I=-16:TP=-1.5:LRA=11"])
@@ -66,6 +70,15 @@ class MediaDownloader:
         return opciones
 
     def extraer_info(self) -> Tuple[List[Dict[str, Any]], str | None]:
+        # Deteccion automatica si es enlace de Spotify
+        if es_url_spotify(self.config.url):
+            tracks_sp, err = extraer_tracks_spotify(self.config.url)
+            if err:
+                return [], err
+            entries = [{"is_spotify": True, "spotify_meta": t} for t in tracks_sp]
+            return entries, None
+
+        # Proceso estandar de YouTube
         opciones_info = {
             "extract_flat": True,
             "ignoreerrors": True,
@@ -88,12 +101,21 @@ class MediaDownloader:
         indice: int,
         progress_callback: Callable[[int, float, str], None] | None = None,
     ) -> Tuple[bool, str, Path | None, str]:
-        titulo = entry.get("title", f"Pista_{indice}")
-        video_url = (
-            entry.get("webpage_url")
-            or entry.get("url")
-            or f"https://www.youtube.com/watch?v={entry.get('id', '')}"
-        )
+        meta_spotify = None
+
+        if entry.get("is_spotify"):
+            meta_spotify = entry["spotify_meta"]
+            titulo = f"{meta_spotify['artist']} - {meta_spotify['title']}"
+            video_url, err = buscar_coincidencia_youtube(meta_spotify)
+            if not video_url or err:
+                return False, titulo, None, err or "Sin coincidencia en YouTube."
+        else:
+            titulo = entry.get("title", f"Pista_{indice}")
+            video_url = (
+                entry.get("webpage_url")
+                or entry.get("url")
+                or f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+            )
 
         plantilla = str(self.config.directorio_salida / "%(title)s.%(ext)s")
         ext_esperada = f".{self.config.formato}"
@@ -127,7 +149,12 @@ class MediaDownloader:
                 thumb_path = next((t for t in posibles_thumbs if t.exists()), None)
 
                 if self.config.formato == "mp3" and archivo_final.exists():
-                    incrustar_metadatos_mp3(archivo_final, info_descarga, thumb_path)
+                    incrustar_metadatos_mp3(
+                        archivo_final,
+                        info_descarga,
+                        thumb_path,
+                        meta_spotify=meta_spotify,
+                    )
 
                 for t in posibles_thumbs:
                     if t.exists():
@@ -158,7 +185,11 @@ class MediaDownloader:
         def update_progress(idx: int, percent: float, speed: str):
             if progress_manager and tasks_map and idx in tasks_map:
                 task_id = tasks_map[idx]
-                progress_manager.update(task_id, completed=percent, description=f"[cyan]Pista {idx} ({speed})")
+                progress_manager.update(
+                    task_id,
+                    completed=percent,
+                    description=f"[cyan]Item {idx} ({speed})",
+                )
 
         with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
             futuros = [

@@ -5,7 +5,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import (
     BarColumn,
-    DownloadColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
@@ -64,7 +63,12 @@ def main() -> None:
         tasks_map = {}
         with progress:
             for idx, entry in enumerate(entries, start=1):
-                titulo = entry.get("title", f"Pista #{idx}")
+                if entry.get("is_spotify"):
+                    meta = entry["spotify_meta"]
+                    titulo = f"{meta['artist']} - {meta['title']}"
+                else:
+                    titulo = entry.get("title", f"Pista #{idx}")
+
                 nombre_corto = (titulo[:35] + "..") if len(titulo) > 37 else titulo
                 task_id = progress.add_task(f"[dim]Esperando: {nombre_corto}", total=100)
                 tasks_map[idx] = task_id

@@ -15,13 +15,13 @@ console = Console()
 def solicitar_datos_interactivos() -> Tuple[str, str, str, str, bool, int]:
     console.print(
         Panel.fit(
-            "[bold cyan]YouTube Downloader Pro[/bold cyan]\n"
-            "[dim]Audio/Video concurrente con normalizacion y transferencia QR[/dim]",
+            "[bold cyan]Media Downloader Pro (YouTube & Spotify)[/bold cyan]\n"
+            "[dim]Audio/Video concurrente con metadatos oficiales y QR local[/dim]",
             border_style="cyan",
         )
     )
 
-    url = Prompt.ask("[bold yellow]Ingresa el enlace de YouTube (video o playlist)[/bold yellow]").strip()
+    url = Prompt.ask("[bold yellow]Ingresa el enlace (YouTube o Spotify)[/bold yellow]").strip()
     if not url:
         console.print("[red]Error: El enlace no puede estar vacio.[/red]")
         sys.exit(1)
@@ -64,9 +64,9 @@ def solicitar_datos_interactivos() -> Tuple[str, str, str, str, bool, int]:
 
 def obtener_configuracion(temp_dir: Path) -> DownloadConfig:
     parser = argparse.ArgumentParser(
-        description="Downloader concurrente de YouTube con interfaz Rich, normalizacion y QR."
+        description="Downloader concurrente de YouTube y Spotify con interfaz Rich, normalizacion y QR."
     )
-    parser.add_argument("-u", "--url", type=str, help="URL del video o playlist.")
+    parser.add_argument("-u", "--url", type=str, help="URL de YouTube o Spotify.")
     parser.add_argument("-f", "--format", choices=["mp3", "mp4"], help="Formato de salida.")
     parser.add_argument("-q", "--quality", type=str, help="Calidad de audio o video.")
     parser.add_argument("-o", "--output", type=str, default="descargas", help="Ruta de salida.")
