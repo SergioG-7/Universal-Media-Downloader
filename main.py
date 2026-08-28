@@ -2,12 +2,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-from core.downloader import MediaDownloader
-from utils.cli import obtener_configuracion
-from utils.file_ops import empaquetar_en_zip, mover_archivos_a_destino
+from src.client import obtener_configuracion
+from src.downloader import MediaDownloader
+from src.file_dir import empaquetar_en_zip, mover_archivos_a_destino
+from src.server import servir_archivo_y_mostrar_qr
 
 
 def main() -> None:
+    # Contexto temporal seguro: se destruye automaticamente al salir
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         config = obtener_configuracion(temp_path)
@@ -26,18 +28,37 @@ def main() -> None:
         print("RESUMEN DE LA OPERACION")
         print("=" * 50)
 
-        if descargados:
-            print(f"[+] Completados: {len(descargados)} archivo(s).")
-            if config.empaquetar_zip and config.ruta_zip:
-                zip_path = empaquetar_en_zip(descargados, config.ruta_zip)
-                if zip_path:
-                    print(f"[+] Archivo ZIP generado en: {zip_path}")
-            else:
-                destino = Path("descargas").resolve()
-                mover_archivos_a_destino(descargados, destino)
-                print(f"[+] Archivos guardados en: {destino}")
-        else:
+        if not descargados:
             print("[-] No se pudo procesar ningun archivo.")
+            if fallidos:
+                print(f"\n[!] Fallos ({len(fallidos)}):")
+                for f in fallidos:
+                    print(f"  - {f['titulo']}: {f['razon']}")
+            return
+
+        print(f"[+] Completados: {len(descargados)} archivo(s).")
+
+        # Flujo segun la opcion seleccionada
+        if config.modo_salida == "movil":
+            # Si es mas de un archivo, se empaqueta en zip temporal para pasarlo todo junto
+            if len(descargados) > 1:
+                zip_temporal = temp_path / "descargas_movil.zip"
+                archivo_a_servir = empaquetar_en_zip(descargados, zip_temporal)
+            else:
+                archivo_a_servir = descargados[0]
+
+            if archivo_a_servir and archivo_a_servir.exists():
+                servir_archivo_y_mostrar_qr(archivo_a_servir)
+                print("[*] Archivos temporales eliminados del PC correctamente.")
+
+        elif config.modo_salida == "zip" and config.ruta_destino:
+            zip_path = empaquetar_en_zip(descargados, config.ruta_destino)
+            if zip_path:
+                print(f"[+] Archivo ZIP guardado en PC: {zip_path}")
+
+        elif config.modo_salida == "carpeta" and config.ruta_destino:
+            mover_archivos_a_destino(descargados, config.ruta_destino)
+            print(f"[+] Archivos guardados en carpeta de PC: {config.ruta_destino}")
 
         if fallidos:
             print(f"\n[!] Fallos ({len(fallidos)}):")

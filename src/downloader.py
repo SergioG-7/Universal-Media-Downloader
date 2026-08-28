@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Tuple
 import imageio_ffmpeg
 import yt_dlp
 
-from core.config import DownloadConfig
-from core.postprocessor import incrustar_metadatos_mp3
+from src.config import DownloadConfig
+from src.postprocessor import incrustar_metadatos_mp3
 
 
 class MediaDownloader:
@@ -80,7 +80,7 @@ class MediaDownloader:
             or f"https://www.youtube.com/watch?v={entry.get('id', '')}"
         )
 
-        plantilla = str(self.config.directorio_salida / f"%(title)s_{indice}.%(ext)s")
+        plantilla = str(self.config.directorio_salida / "%(title)s.%(ext)s")
         opciones = self._obtener_opciones_ydl(plantilla)
         ext_esperada = f".{self.config.formato}"
 
