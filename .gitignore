@@ -30,3 +30,7 @@ descargas/
 *.log
 .pytest_cache/
 history.json
+
+# Claude Code local config
+.claude/
+.mcp.json
